@@ -60,3 +60,109 @@ Pre analytické spracovanie dát bol navrhnutý dimenzionálny model typu Star S
   FK: country_id, date_id, report_type_id, transmission_id<br>
   Atribúty: cases_total, deaths_total, deaths_new, total_cases<br>
   )
+
+---
+
+## 3. ELT proces v Snowflake
+### Extrahovanie a načítanie dát:
+Zdrojové dáta boli získané priamo zo Snowflake Marketplace prostredníctvom zdieľaného datasetu. Tento prístup eliminuje potrebu manuálneho sťahovania súborov, nakoľko dáta sú prístupné priamo v Snowflake prostredníctvom databázy Covid-19
+
+Pre účely projektu boli zo schémy WHO vybrané tri hlavné tabuľky:
+- WHO_TIMESERIES
+- WHO_DAILY_REPORT
+- WHO_SITUATION_REPORTS
+
+Následne prebehlo načítanie dát (Vytvorenie staging tabuliek pre surové dáta)
+
+```sql
+CREATE OR REPLACE TABLE WHO_TIMESERIES AS
+SELECT * 
+FROM COVID19_EPIDEMIOLOGICAL_DATA.PUBLIC.WHO_TIMESERIES;
+
+CREATE OR REPLACE TABLE WHO_SITUATION_REPORTS AS
+SELECT * 
+FROM COVID19_EPIDEMIOLOGICAL_DATA.PUBLIC.WHO_SITUATION_REPORTS;
+
+CREATE OR REPLACE TABLE WHO_DAILY_REPORT AS
+SELECT * 
+FROM COVID19_EPIDEMIOLOGICAL_DATA.PUBLIC.WHO_DAILY_REPORT;
+```
+
+Prebehlo overenie, či sa surové dáta zo Snowflake Marketplace správne načítali do staging vrstvy
+
+```sql
+SELECT * FROM WHO_TIMESERIES;
+SELECT * FROM WHO_SITUATION_REPORTS;
+SELECT * FROM WHO_DAILY_REPORT;
+```
+
+### Transformácia dát
+V tejto fáze prebehlo čistenie, deduplikácia a reorganizácia dát zo staging tabuliek do finálnej štruktúry dimenzií a faktovej tabuľky.
+
+### Dimenzie
+Dimenzie boli navrhnuté tak, aby poskytovali kontext pre epidemiologické štatistiky.
+
+Dimenzia `dim_date` je kľúčová pre časovú analýzu vývoja pandémie. Obsahuje rozdelenie na rok, mesiac a deň. Táto dimenzia je klasifikovaná ako SCD Typ 0, pretože kalendárne údaje sú statické a nemenné.
+
+```sql
+CREATE OR REPLACE TABLE DIM_DATE AS
+SELECT 
+    ROW_NUMBER() OVER (ORDER BY d_date) AS date_id,
+    d_date AS date,
+    YEAR(d_date) AS year,
+    MONTH(d_date) AS month,
+    DAY(d_date) AS day
+FROM(
+    SELECT DISTINCT CAST(DATE AS DATE) as d_date FROM WHO_TIMESERIES
+    UNION
+    SELECT DISTINCT CAST(DATE AS DATE) FROM WHO_SITUATION_REPORTS
+    UNION
+    SELECT DISTINCT CAST(DATE AS DATE) FROM WHO_DAILY_REPORT
+);
+```
+
+Dimenzia `dim_country` obsahuje geografické údaje o krajinách. Pri transformácii bol použitý príkaz `TRIM` na odstránenie bielych znakov a `DISTINCT` na zabezpečenie unikátnosti záznamov. Z hľadiska zachovania histórie je táto dimenzia typu SCD Typ 1, čo znamená, že v prípade zmeny názvu krajiny sa hodnota prepíše najaktuálnejšou.
+
+```sql
+CREATE OR REPLACE TABLE dim_country AS
+SELECT 
+    ROW_NUMBER() OVER (ORDER BY country_name) AS country_id,
+    country_name,
+    iso_code
+FROM(
+    SELECT DISTINCT TRIM(COUNTRY_REGION) as country_name, ISO3166_1 as iso_code FROM WHO_TIMESERIES
+    UNION
+    SELECT DISTINCT TRIM(COUNTRY_REGION), ISO3166_1 FROM WHO_SITUATION_REPORTS
+);
+```
+
+Dimenzia `dim_report_type` slúži ako číselník pre typy správ (napr. Timeseries, Daily report), čo umožňuje filtrovať metriky podľa ich pôvodu. Ide o SCD Typ 0.
+
+```sql
+CREATE OR REPLACE TABLE dim_report_type AS
+SELECT
+    CAST(ROW_NUMBER() OVER(ORDER BY report_name) AS INT) AS REPORT_TYPE_ID,
+    report_name
+FROM(
+    SELECT 'TIMESERIES' AS report_name
+    UNION ALL
+    SELECT 'DAILY_REPORT'
+    UNION ALL
+    SELECT 'SITUATION_REPORT'
+);
+```
+
+Dimenzia `dim_transmission_classification` uchováva informácie o type šírenia nákazy. Táto kategorizácia je dôležitá pre epidemiologické štúdie a porovnávanie efektivity opatrení. Z hľadiska zachovania dát ide o SCD Typ 0, keďže klasifikácie priradené k historickým reportom sa spätne nemenia.
+
+```sql
+CREATE OR REPLACE TABLE dim_transmission_classification AS
+SELECT 
+    ROW_NUMBER() OVER(ORDER BY TRANSMISSION_CLASSIFICATION) AS transmission_id,
+    TRANSMISSION_CLASSIFICATION
+FROM(
+    SELECT DISTINCT TRANSMISSION_CLASSIFICATION
+    FROM WHO_TIMESERIES
+    WHERE TRANSMISSION_CLASSIFICATION IS NOT NULL
+);
+```
+
