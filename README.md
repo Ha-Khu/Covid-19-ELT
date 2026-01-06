@@ -31,3 +31,11 @@ Táto tabuľka obsahuje časové rady celkového počtu prípadov a úmrtí pre 
 Tabuľka obsahuje denné reporty o počte prípadov a úmrtí pre jednotlivé krajiny. Dáta sú vhodné na detailnú analýzu denných zmien a porovnanie s agregovanými časovými radmi.
 #### WHO_SITUATION_REPORTS:
 Táto tabuľka obsahuje situačné správy WHO, ktoré zahŕňajú celkový počet prípadov, nové úmrtia a názov konkrétneho reportu. Poskytuje kontextové informácie k epidemiologickej situácii v daný deň.
+
+---
+
+## ERD diagram
+Zdrojové tabuľky neobsahujú explicitne definované primárne ani cudzie kľúče, keďže ide o analytické datasety. Vzťahy medzi tabuľkami sú preto logické, založené najmä na kombinácii atribútov COUNTRY_REGION a DATE. ERD diagram slúži ako vizuálny prehľad pôvodnej dátovej štruktúry, ktorá je následne transformovaná do dimenzionálneho modelu (Star Schema).
+<p align="center">
+  <img src="https://github.com/Ha-Khu/Covid-19-ELT/blob/main/img/ERD_diagram.png" alt="ERD Schema">
+</p>
