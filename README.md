@@ -39,3 +39,24 @@ Zdrojové tabuľky neobsahujú explicitne definované primárne ani cudzie kľú
 <p align="center">
   <img src="https://github.com/Ha-Khu/Covid-19-ELT/blob/main/img/ERD_diagram.png" alt="ERD Schema">
 </p>
+
+---
+
+## 2. Návrh dimenzionálneho modelu (Star schema)
+Pre analytické spracovanie dát bol navrhnutý dimenzionálny model typu Star Schema, ktorý umožňuje efektívne agregácie a jednoduchú tvorbu analytických dotazov a vizualizácií. Model pozostáva z jednej faktovej tabuľky a štyroch dimenzií.
+<p align="center">
+  <img src="https://github.com/Ha-Khu/Covid-19-ELT/blob/main/img/StarSchema.png" alt="Star schema">
+</p>
+
+### Popis dimenzií
+- `dim_country` - Obsahuje geografické údaje o jednotlivých krajinách (country_id(PK), country_region, ISO3166_1)
+- `dim_date` - Slúži na časovú analýzu dát (date_id(PK), date, year, month, day)
+- `dim_report_type` - Obsahuje dáta z ktorého metriky pochádzajú (report_type_id(PK), report_name)
+- `dim_transmission_classification` - Obsahuje klasifikácie prenosu ochorenia (transmission_id(PK), transmission_classification)
+
+### Popis faktovej tabuľky
+- `fact_covid` - Obsahuje hlavné metriky súvisiace s vývojom ochorenia COVID-19 a prepája jednotlivé dimenzie (<br>
+  PK: fact_id<br>
+  FK: country_id, date_id, report_type_id, transmission_id<br>
+  Atribúty: cases_total, deaths_total, deaths_new, total_cases<br>
+  )
