@@ -318,3 +318,7 @@ WHERE d.year != 2021 AND d.year != 2023
 GROUP BY mesiac
 ORDER BY mesiac ASC;
 ```
+
+---
+Autor: Dávid Plevka
+---
