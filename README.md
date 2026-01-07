@@ -249,6 +249,7 @@ Dashboard obsahuje 5 vizualizácií ktoré slúžia na prezentáciu analytickýc
 --- 
 
 ### Graf 1: Vývoj prípadov v celkovom čase
+Tento graf zobrazuje kumulatívny nárast celkového počtu potvrdených prípadov COVID-19 na globálnej úrovni. Umožňuje sledovať celkovú trajektóriu pandémie a identifikovať obdobia najrýchlejšieho šírenia vírusu.
 
 ```sql
 SELECT d.date, SUM(f.total_cases) as globalne_pripady
@@ -261,6 +262,7 @@ ORDER BY d.date;
 ---
 
 ### Graf 2: Priemerný počet úmrtí podľa typu prenosu
+Graf analyzuje závažnosť dopadov pandémie v závislosti od spôsobu šírenia nákazy. Zobrazuje priemerný počet úmrtí pripadajúcich na jednotlivé kategórie klasifikácie prenosu. Pomáha identifikovať, ktoré typy prenosu (napr. komunitné šírenie) sú štatisticky spojené s vyššou mortalitou, čo je kľúčové pre pochopenie rizikovosti rôznych prostredí.
 
 ```sql
 SELECT t.TRANSMISSION_CLASSIFICATION as typ_prenosu,
@@ -277,6 +279,7 @@ ORDER BY priemerny_pocet_umrti DESC;
 ---
 
 ### Graf 3: Top 10 krajín podľa celkového počtu úmrtí
+Vizualizácia identifikuje desať krajín, ktoré zaznamenali najvyšší celkový počet obetí. Z analýzy sú odfiltrované súhrnné globálne záznamy, aby sa zachovala relevantnosť na úrovni jednotlivých štátov. Poskytuje jasný prehľad o tom, ktoré geografické oblasti boli pandémiou zasiahnuté najtragickejšie z hľadiska absolútnych čísiel.
 
 ```sql
 SELECT c.country_name, MAX(f.deaths_total) as celkovo_umrti
@@ -291,6 +294,7 @@ LIMIT 10;
 ---
 
 ### Graf 4: Počet typov prenosu ochorenia
+Tento graf zobrazuje distribúciu záznamov v databáze podľa klasifikácie prenosu. Odfiltrované sú neznáme kategórie ('Unknown'). Demonštruje variabilitu dát v dimenzii prenosu a ukazuje, ktoré scenáre šírenia boli v hláseniach WHO najčastejšie zastúpené.
 
 ```sql
 SELECT t.TRANSMISSION_CLASSIFICATION, COUNT(*) as pocet_zaznamov
@@ -303,6 +307,7 @@ GROUP BY t.TRANSMISSION_CLASSIFICATION;
 ---
 
 ### Graf 5: Mesačný prírastok nových prípadov
+graf zobrazuje dynamiku šírenia nákazy agregovanú na úrovni mesiacov čo umožňuje lepšie sledovanie dlhodobých trendov a sezónnych výkyvov. Dáta sú očistené o roky 2021 a 2023 pre lepšiu prehľadnosť špecifických vĺn pandémie.
 
 ```sql
 SELECT DATE_TRUNC('month', d.date) as mesiac,
