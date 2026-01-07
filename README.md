@@ -58,7 +58,7 @@ Pre analytické spracovanie dát bol navrhnutý dimenzionálny model typu Star S
 - `fact_covid` - Obsahuje hlavné metriky súvisiace s vývojom ochorenia COVID-19 a prepája jednotlivé dimenzie (<br>
   PK: fact_id<br>
   FK: country_id, date_id, report_type_id, transmission_id<br>
-  Atribúty: cases_total, deaths_total, deaths_new, total_cases<br>
+  Atribúty: cases_total_new, deaths_total, deaths_new, total_cases<br>
   )
 
 ---
