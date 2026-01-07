@@ -18,3 +18,64 @@ FROM COVID19_EPIDEMIOLOGICAL_DATA.PUBLIC.WHO_SITUATION_REPORTS;
 SELECT * FROM WHO_TIMESERIES;
 SELECT * FROM WHO_SITUATION_REPORTS;
 SELECT * FROM WHO_DAILY_REPORT;
+---------------------- DIM DATE ---------------------------
+-- Dimenzia času, vytvorená zo všetkých unikátnych dátumov
+CREATE OR REPLACE TABLE DIM_DATE AS
+SELECT 
+    ROW_NUMBER() OVER (ORDER BY d_date) AS date_id,
+    d_date AS date,
+    YEAR(d_date) AS year,
+    MONTH(d_date) AS month,
+    DAY(d_date) AS day
+FROM(
+    SELECT DISTINCT CAST(DATE AS DATE) as d_date FROM WHO_TIMESERIES
+    UNION
+    SELECT DISTINCT CAST(DATE AS DATE) FROM WHO_SITUATION_REPORTS
+    UNION
+    SELECT DISTINCT CAST(DATE AS DATE) FROM WHO_DAILY_REPORT
+);
+
+SELECT * FROM DIM_DATE;
+------------------------ DIM COUNTRY -----------------------
+-- Obsahuje jedinečné krajiny zo zdrojových dát
+-- TRIM() používa na odstránenie medzier
+CREATE OR REPLACE TABLE dim_country AS
+SELECT 
+    ROW_NUMBER() OVER (ORDER BY country_name) AS country_id,
+    country_name,
+    iso_code
+FROM(
+    SELECT DISTINCT TRIM(COUNTRY_REGION) as country_name, ISO3166_1 as        iso_code FROM WHO_TIMESERIES
+    UNION
+    SELECT DISTINCT TRIM(COUNTRY_REGION), ISO3166_1 FROM WHO_SITUATION_REPORTS
+);
+
+SELECT * FROM dim_country;
+---------------------- DIM REPORT TYPE ---------------------
+-- Určuje pôvod záznamu
+CREATE OR REPLACE TABLE dim_report_type AS
+SELECT
+    CAST(ROW_NUMBER() OVER(ORDER BY report_name) AS INT) AS REPORT_TYPE_ID,
+    report_name
+FROM(
+    SELECT 'TIMESERIES' AS report_name
+    UNION ALL
+    SELECT 'DAILY_REPORT'
+    UNION ALL
+    SELECT 'SITUATION_REPORT'
+);
+
+SELECT * FROM dim_report_type;
+--------------------- DIM TRANSMISSION ----------------
+-- Klasifikácia prenosu ochorenia
+CREATE OR REPLACE TABLE dim_transmission_classification AS
+SELECT 
+    ROW_NUMBER() OVER(ORDER BY TRANSMISSION_CLASSIFICATION) AS transmission_id,
+    TRANSMISSION_CLASSIFICATION
+FROM(
+    SELECT DISTINCT TRANSMISSION_CLASSIFICATION
+    FROM WHO_TIMESERIES
+    WHERE TRANSMISSION_CLASSIFICATION IS NOT NULL
+);
+
+SELECT * FROM dim_transmission_classification;
