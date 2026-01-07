@@ -96,6 +96,8 @@ SELECT * FROM WHO_SITUATION_REPORTS;
 SELECT * FROM WHO_DAILY_REPORT;
 ```
 
+---
+
 ### Transformácia dát
 V tejto fáze prebehlo čistenie, deduplikácia a reorganizácia dát zo staging tabuliek do finálnej štruktúry dimenzií a faktovej tabuľky.
 
@@ -165,4 +167,73 @@ FROM(
     WHERE TRANSMISSION_CLASSIFICATION IS NOT NULL
 );
 ```
+### Faktová tabuľka
+
+Faktová tabuľka `FACT_COVID` predstavuje centrálny bod modelu a prepája všetky dimenzie. Obsahuje kľúčové metriky o počte nakazených a úmrtí. Proces jej tvorby zahŕňal zjednotenie troch rôznych zdrojov dát pomocou operácie `UNION ALL` a následné čistenie dát v rámci spoločnej staging vrstvy. Pre hlbšiu analytickú hodnotu boli použité window funkcie (`LAG`), ktoré umožnili transformovať kumulatívne údaje na denné prírastky (`cases_total_new`, `deaths_new`).
+
+```sql
+CREATE OR REPLACE TABLE FACT_COVID AS
+WITH unified_staging AS(
+    SELECT
+    TRIM(COUNTRY_REGION) as c_name, CAST(DATE AS DATE) as d_date, 3 as r_type,
+    CASES_TOTAL as tot_cases, DEATHS_TOTAL as tot_deaths,
+    TRANSMISSION_CLASSIFICATION as trans_class
+FROM WHO_TIMESERIES
+UNION ALL
+
+SELECT
+    TRIM(COUNTRY_REGION), CAST(DATE AS DATE), 2,
+    TOTAL_CASES, DEATHS,
+    TRANSMISSION_CLASSIFICATION
+FROM WHO_SITUATION_REPORTS
+UNION ALL
+
+SELECT
+    TRIM(COUNTRY_REGION), CAST(DATE AS DATE), 1,
+    CASES_TOTAL, DEATHS_TOTAL,
+    NULL
+FROM WHO_DAILY_REPORT
+),
+final_calculation AS(
+SELECT
+    c_name, d_date, r_type,
+    MAX(tot_cases) as cases_max,
+    MAX(tot_deaths) as deaths_max,
+    MAX(trans_class) as trans_class
+FROM unified_staging
+GROUP BY 1, 2, 3
+)
+SELECT
+    ROW_NUMBER() OVER (ORDER BY m.d_date, c.country_id) AS fact_id,
+    c.country_id,
+    d.date_id,
+    m.r_type as report_type_id,
+    COALESCE(tc.transmission_id, 0) as transmission_id,
+    m.cases_max as total_cases,
+    m.deaths_max as deaths_total,
+
+    COALESCE(m.cases_max - LAG(m.cases_max) OVER (PARTITION BY c.country_id
+    ORDER BY m.d_date), 0) as cases_total_new,
+
+    COALESCE(m.deaths_max - LAG(m.deaths_max) OVER (PARTITION BY c.country_id
+    ORDER BY m.d_date), 0) as deaths_new
+    
+FROM final_calculation m
+JOIN DIM_COUNTRY c ON m.c_name = c.country_name
+JOIN DIM_DATE d ON m.d_date = d.date
+LEFT JOIN dim_transmission_classification tc ON m.trans_class = tc.TRANSMISSION_CLASSIFICATION;
+```
+
+Následne prebehla validácia dát pomocou dopytu nad krajinou Čína, kde bolo overené správne prepojenie na všetky dimenzie vrátane klasifikácie prenosu.
+
+```sql
+SELECT c.country_name, d.date, f.total_cases, f.cases_total_new, deaths_total, f.deaths_new, t.TRANSMISSION_CLASSIFICATION
+FROM FACT_COVID f
+JOIN DIM_COUNTRY c ON f.country_id = c.country_id
+JOIN DIM_DATE d ON f.date_id = d.date_id
+LEFT JOIN DIM_TRANSMISSION_CLASSIFICATION t ON f.transmission_id = t.transmission_id
+WHERE c.country_name = 'China'
+ORDER BY d.date ASC;
+```
+
 
